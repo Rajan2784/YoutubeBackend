@@ -1,5 +1,5 @@
 import { ApiError } from "../utils/ApiError.js";
-import { asynHandler } from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -27,7 +27,7 @@ const generateAccessAndRefreshTokens = async (userId) => {
   }
 };
 
-const registerUser = asynHandler(async (req, res) => {
+const registerUser = asyncHandler(async (req, res) => {
   const { fullName, email, username, password } = req.body;
 
   if (
@@ -85,7 +85,7 @@ const registerUser = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User created Successfully"));
 });
 
-const loginUser = asynHandler(async (req, res) => {
+const loginUser = asyncHandler(async (req, res) => {
   const { email, username, password } = req.body;
 
   // Validation
@@ -136,7 +136,7 @@ const loginUser = asynHandler(async (req, res) => {
     );
 });
 
-const logoutUser = asynHandler(async (req, res) => {
+const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -160,7 +160,7 @@ const logoutUser = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Logged out Successfully"));
 });
 
-const refreshAccessToken = asynHandler(async (req, res) => {
+const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) throw new BadRequestError("Unauthorized request");
@@ -202,7 +202,7 @@ const refreshAccessToken = asynHandler(async (req, res) => {
   }
 });
 
-const changeCurrentPassword = asynHandler(async (req, res) => {
+const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const user = await User.findById(req.user?._id);
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
@@ -217,13 +217,13 @@ const changeCurrentPassword = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, "Password has been changed"));
 });
 
-const getCurrentUser = asynHandler(async (req, res) => {
+const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, req.user, "current user fetched successfully"));
 });
 
-const updateUserAvatar = asynHandler(async (req, res) => {
+const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
   if (avatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing");
@@ -247,7 +247,7 @@ const updateUserAvatar = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Avatar image updated successfully"));
 });
 
-const updateUserCoverImage = asynHandler(async (req, res) => {
+const updateUserCoverImage = asyncHandler(async (req, res) => {
   const coverLocalPath = req.file?.path;
   if (coverLocalPath) {
     throw new ApiError(400, "CoverImage file is missing");
@@ -272,7 +272,7 @@ const updateUserCoverImage = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Cover image updated successfully"));
 });
 
-const getUserChannelProfile = asynHandler(async (req, res) => {
+const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.params;
   if (!username?.trim()) {
     throw new ApiError(400, "Username is missing");
@@ -341,7 +341,7 @@ const getUserChannelProfile = asynHandler(async (req, res) => {
     .json(new ApiResponse(200, channel[0], "User channel found successfully"));
 });
 
-const getWatchHistory = asynHandler(async (req, res) => {
+const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
