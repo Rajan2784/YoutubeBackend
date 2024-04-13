@@ -138,17 +138,17 @@ const getVideoById = asyncHandler(async (req, res) => {
   const user = await User.findById(userId);
   if (!user) throw new ApiError(404, "User not found");
 
-  if(!user.watchHistory.includes(videoId)){
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { watchHistory: videoId },
-      new:true
+  if (!user.watchHistory.includes(videoId)) {
+    await Video.findByIdAndUpdate(videoId, {
+      $inc: { views: 1 },
+      new: true,
     });
   }
 
-  await Video.findByIdAndUpdate(videoId,{
-    $inc: { views: 1 },
-    new:true
-  })
+  await User.findByIdAndUpdate(userId, {
+    $addToSet: { watchHistory: videoId },
+    new: true,
+  });
 
   return res.status(200).json(new ApiResponse(200, "Video found", video));
 });
