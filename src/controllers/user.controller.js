@@ -36,9 +36,6 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fileds are required");
   }
 
-  if (password.length < 6) {
-    throw new ApiError(400, "Password must be at least 6 characters");
-  }
 
   const existedUser = await User.findOne({
     $or: [{ username }, { email }],
@@ -48,6 +45,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with email or username is already existed");
   }
   const avatarLocal = req.files?.avatar[0]?.path;
+  console.log(avatarLocal)
   let coverImageLocal;
   if (
     req.files &&
@@ -131,7 +129,7 @@ const loginUser = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         {
-          user: loggedInUser,
+          loggedInUser,
           accessToken,
           refreshToken,
         },
