@@ -150,7 +150,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     new: true,
   });
 
-  return res.status(200).json(new ApiResponse(200, "Video found", video));
+  return res.status(200).json(new ApiResponse(200, video, "Video found"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
