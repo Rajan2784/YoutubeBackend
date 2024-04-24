@@ -31,9 +31,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
   const aggregateObject = [
     {
-      $match: {
-        isPublished: true,
-      },
+      $match: matchCondition,
     },
     {
       $lookup: {
@@ -60,6 +58,21 @@ const getAllVideos = asyncHandler(async (req, res) => {
         },
       },
     },
+    {
+      $lookup:{
+        from:"likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "likes",
+      }
+    },
+    {
+      $addFields:{
+        likes:{
+          $size: "$likes"
+        }
+      }
+    }
   ];
 
   const userVideos = Video.aggregate(aggregateObject);
@@ -145,12 +158,40 @@ const getVideoById = asyncHandler(async (req, res) => {
     });
   }
 
+  const videoData = await Video.aggregate([
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner_details",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              fullName: 1,
+              avatar: 1,
+              username: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        owner_details: {
+          $arrayElemAt: ["$owner_details", 0],
+        },
+      },
+    },
+  ]);
+
   await User.findByIdAndUpdate(userId, {
     $addToSet: { watchHistory: videoId },
     new: true,
   });
 
-  return res.status(200).json(new ApiResponse(200, video, "Video found"));
+  return res.status(200).json(new ApiResponse(200, videoData, "Video found"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {

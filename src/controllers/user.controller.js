@@ -36,7 +36,6 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fileds are required");
   }
 
-
   const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
@@ -45,7 +44,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with email or username is already existed");
   }
   const avatarLocal = req.files?.avatar[0]?.path;
-  console.log(avatarLocal)
+  console.log(avatarLocal);
   let coverImageLocal;
   if (
     req.files &&
@@ -165,7 +164,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
-  if (!incomingRefreshToken) throw new BadRequestError("Unauthorized request");
+  if (!incomingRefreshToken) throw new ApiError(401, "Unauthorized request");
 
   try {
     const decodedToken = jwt.verify(
@@ -337,17 +336,17 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   if (!channel?.length) {
     throw new ApiError(404, "Channel not found");
   }
-  console.log(channel);
   return res
     .status(200)
     .json(new ApiResponse(200, channel[0], "User channel found successfully"));
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(req.user._id),
+        _id: new mongoose.Types.ObjectId(userId),
       },
     },
     {
@@ -362,34 +361,45 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               from: "users",
               localField: "owner",
               foreignField: "_id",
-              as: "owner",
-              pipeline: {
-                $project: {
-                  fullName: 1,
-                  username: 1,
-                  avatar: 1,
-                },
-              },
+              as: "ownerDetails",
+              pipeline:[
+                {
+                  $project:{
+                    fullName:1,
+                    avatar:1,
+                    coverImage:1
+                  }
+                }
+              ]
             },
           },
           {
             $addFields: {
               owner: {
-                $first: "$owner",
+                $arrayElemAt: ["$ownerDetails",0],
               },
             },
           },
+          {
+            $project:{
+              ownerDetails:0
+            }
+          }
         ],
       },
     },
+    {
+      $addFields:{
+        history:{
+          $first:"$watchHistory"
+        }
+      }
+    }
   ]);
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, user[0].watchHistory, "History fetched successfully")
-    );
+  return res.status(200).json(new ApiResponse(200, user[0].watchHistory, "History fetched successfully"));
 });
+
 
 export {
   registerUser,
