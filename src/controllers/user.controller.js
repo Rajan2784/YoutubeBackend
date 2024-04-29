@@ -111,10 +111,11 @@ const loginUser = asyncHandler(async (req, res) => {
   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     user._id
   );
+
   // Remove sensitive data from response
-  const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshtoken"
-  );
+  const loggedInUser = await User.findByIdAndUpdate(user._id, {
+    refreshtoken: refreshToken,
+  }).select("-password -refreshtoken");
 
   const option = {
     httpOnly: true,
@@ -169,15 +170,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   try {
     const decodedToken = jwt.verify(
       incomingRefreshToken,
-      process.env.ACCESS_TOKEN_SECRET
+      process.env.REFRESH_TOKEN_SECRET
     );
+    const userId = new mongoose.Types.ObjectId(decodedToken?._id);
+    const user = await User.findById(userId);
 
-    const user = User.findById(decodedToken?._id);
     if (!user) {
       throw new ApiError(401, "Invalid refresh token");
     }
 
-    if (incomingRefreshToken !== user?.refreshToken) {
+    if (incomingRefreshToken !== user?.refreshtoken) {
       throw new ApiError(401, "Refresh token is expired or used");
     }
 
@@ -194,7 +196,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       .json(
         new ApiResponse(
           200,
-          { accessToken, refreshtoken: newRefreshToken },
+          { accessToken, refreshToken: newRefreshToken },
           "Access Token refreshed"
         )
       );
@@ -362,44 +364,47 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               localField: "owner",
               foreignField: "_id",
               as: "ownerDetails",
-              pipeline:[
+              pipeline: [
                 {
-                  $project:{
-                    fullName:1,
-                    avatar:1,
-                    coverImage:1
-                  }
-                }
-              ]
+                  $project: {
+                    fullName: 1,
+                    avatar: 1,
+                    coverImage: 1,
+                  },
+                },
+              ],
             },
           },
           {
             $addFields: {
               owner: {
-                $arrayElemAt: ["$ownerDetails",0],
+                $arrayElemAt: ["$ownerDetails", 0],
               },
             },
           },
           {
-            $project:{
-              ownerDetails:0
-            }
-          }
+            $project: {
+              ownerDetails: 0,
+            },
+          },
         ],
       },
     },
     {
-      $addFields:{
-        history:{
-          $first:"$watchHistory"
-        }
-      }
-    }
+      $addFields: {
+        history: {
+          $first: "$watchHistory",
+        },
+      },
+    },
   ]);
 
-  return res.status(200).json(new ApiResponse(200, user[0].watchHistory, "History fetched successfully"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, user[0].watchHistory, "History fetched successfully")
+    );
 });
-
 
 export {
   registerUser,
