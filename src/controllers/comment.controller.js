@@ -26,14 +26,14 @@ const getVideoComments = asyncHandler(async (req, res) => {
         localField: "owner",
         foreignField: "_id",
         as: "ownerDetails",
-        pipeline:[
+        pipeline: [
           {
-            $project:{
-              username:1,
-              avatar:1
-            }
-          }
-        ]
+            $project: {
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
       },
     },
     {
@@ -52,15 +52,21 @@ const getVideoComments = asyncHandler(async (req, res) => {
   const options = {
     skip: (page - 1) * limit,
     limit,
-    page
+    page,
   };
 
-  const comments = await Comment.aggregatePaginate(aggregateData, options).then(async (content)=>{
-    if(content.length === 0) return res.status(200).json(new ApiResponse(200,{},"NO comments found on this video"))
+  const comments = await Comment.aggregatePaginate(aggregateData, options).then(
+    async (content) => {
+      if (content.length === 0)
+        return res
+          .status(200)
+          .json(new ApiResponse(200, {}, "NO comments found on this video"));
 
-    return res.status(200).json(new ApiResponse(200,content,"Comments fetched Successfully"))
-  })
-
+      return res
+        .status(200)
+        .json(new ApiResponse(200, content, "Comments fetched Successfully"));
+    }
+  );
 });
 
 const addComment = asyncHandler(async (req, res) => {
@@ -93,6 +99,15 @@ const addComment = asyncHandler(async (req, res) => {
 
 const updateComment = asyncHandler(async (req, res) => {
   // TODO: update a comment
+  const { commentId } = req.params;
+  const { newContent } = req.body;
+  const comment = await Comment.findByIdAndUpdate(
+    new mongoose.Types.ObjectId(commentId),
+    { content: newContent }
+  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, comment, "Comment updated Successfull!!"));
 });
 
 const deleteComment = asyncHandler(async (req, res) => {
@@ -100,9 +115,11 @@ const deleteComment = asyncHandler(async (req, res) => {
   const { commentId } = req.body;
   if (!commentId) throw new ApiError(401, "Please provide a comment id");
 
-  const comment = await Comment.findByIdAndDelete(commentId)
+  const comment = await Comment.findByIdAndDelete(commentId);
 
-  return res.status(200).json(new ApiResponse(200,{},"Comment Deleted Successfully!!"))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Comment Deleted Successfully!!"));
 });
 
 export { getVideoComments, addComment, updateComment, deleteComment };
