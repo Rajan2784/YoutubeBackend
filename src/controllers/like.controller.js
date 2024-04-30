@@ -5,6 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Video } from "../models/video.model.js";
 import { User } from "../models/user.model.js";
+import { Comment } from "../models/comment.model.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -36,6 +37,31 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
   //TODO: toggle like on comment
+  const userId = req.user?._id;
+
+  const comment = await Comment.findById(commentId)
+
+  if(!comment) throw new ApiError(404,"NO comments found with this id!!")
+
+  const likedBy = await User.findById(userId);
+  if (!likedBy) {
+    throw new ApiError(401, "User not found");
+  }
+
+  const like = await Like.findOne({comment,likedBy})
+
+  if(like){
+    await Like.findByIdAndDelete(like._id)
+    return res.status(200).json(new ApiResponse(true,"Like removed"))
+  }
+  const newLike = new Like({
+    comment,
+    likedBy
+  });
+
+  await newLike.save();
+  res.status(200).json(new ApiResponse(true,"Like added"));
+
 });
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
