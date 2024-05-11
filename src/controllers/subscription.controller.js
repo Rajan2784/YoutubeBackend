@@ -37,17 +37,60 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
 
-  const subscribers = await Subscription.find({channel:new mongoose.Types.ObjectId(channelId)})
+  const subscribers = await Subscription.find({
+    channel: new mongoose.Types.ObjectId(channelId),
+  });
 
   // if(!subscribers) throw new ApiError(404,"No Channel found with this id!!")
 
-  return res.status(200).json(new ApiResponse(true, subscribers, "Subscribers fetched"))
-
+  return res
+    .status(200)
+    .json(new ApiResponse(true, subscribers, "Subscribers fetched"));
 });
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
   const { subscriberId } = req.params;
+
+  const channelSubscribed = await Subscription.aggregate([
+    {
+      $match: {
+        subscriber: new mongoose.Types.ObjectId(subscriberId),
+      },
+    },
+    {
+      $lookup:{
+        from: "users",
+        localField: "channel",
+        foreignField: "_id",
+        as: "subscribedChannel",
+        pipeline:[
+          {
+            $project:{
+              username:1,
+              avatar:1,
+            }
+          }
+        ]
+      }
+    },
+    {
+      $addFields:{
+        channel:{
+          $arrayElemAt:["$subscribedChannel",0]
+        }
+      }
+    },
+    {
+      $project:{
+        subscribedChannel:0
+      }
+    }
+  ]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(true, channelSubscribed, "Channels fetched"));
 });
 
 export { toggleSubscription, getUserChannelSubscribers, getSubscribedChannels };

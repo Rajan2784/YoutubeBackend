@@ -76,7 +76,10 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     [
       {
         $match:{
-          likedBy:userId
+          likedBy:userId,
+          video:{
+            $exists:true
+          }
         }
       },
       {
@@ -91,22 +94,30 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                 from:"users",
                 localField:"owner",
                 foreignField:"_id",
-                as:"owner"
+                as:"owner",
+                pipeline:[
+                  {
+                    $project:{
+                      username:1,
+                      avatar:1,
+                    }
+                  }
+                ]
               }
             },
             {
               $addFields:{
                 owner:{
                   $arrayElemAt:["$owner",0]
-                }
-              }
+                },
+              },
             },
           ]
         }
       },
     ]
   )
-  return res.status(200).json(new ApiResponse(true, {likedVideos}, "Liked videos"));
+  return res.status(200).json(new ApiResponse(true, likedVideos, "Liked videos"));
 });
 
 export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos };
