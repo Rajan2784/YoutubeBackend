@@ -167,14 +167,33 @@ const getVideoById = asyncHandler(async (req, res) => {
         as: "owner_details",
         pipeline: [
           {
+            $lookup:{
+              from:"subscriptions",
+              localField:"_id",
+              foreignField:"channel",
+              as:"subscribers"
+            }
+          },
+          {
             $project: {
               _id: 1,
               fullName: 1,
               avatar: 1,
               username: 1,
+              subscribers: {
+                $size: "$subscribers",
+              },
             },
           },
         ],
+      },
+    },
+    {
+      $lookup:{
+        from:"likes",
+        localField:"_id",
+        foreignField:"video",
+        as:"likes",
       },
     },
     {
@@ -182,8 +201,25 @@ const getVideoById = asyncHandler(async (req, res) => {
         owner_details: {
           $arrayElemAt: ["$owner_details", 0],
         },
+        isLiked:{
+          $cond:{
+            if:{
+              $in:[req.user._id,"$likes.likedBy"]
+            },
+            then:true,
+            else:false
+          }
+        },
+        totalLikes:{
+          $size:"$likes"
+        }
       },
     },
+    {
+      $project:{
+        likes:0
+      }
+    }
   ]);
 
   await User.findByIdAndUpdate(userId, {

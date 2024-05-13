@@ -10,14 +10,14 @@ const generateAccessAndRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
     const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    const refreshtoken = user.generateRefreshToken();
 
-    user.refreshToken = refreshToken;
+    user.refreshtoken = refreshtoken;
     await user.save({ validateBeforeSave: false });
 
     return {
       accessToken,
-      refreshToken,
+      refreshtoken,
     };
   } catch (error) {
     throw new ApiError(
@@ -108,13 +108,13 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid Password");
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+  const { accessToken, refreshtoken } = await generateAccessAndRefreshTokens(
     user._id
   );
 
   // Remove sensitive data from response
   const loggedInUser = await User.findByIdAndUpdate(user._id, {
-    refreshtoken: refreshToken,
+    refreshtoken,
   }).select("-password -refreshtoken");
 
   const option = {
@@ -124,14 +124,14 @@ const loginUser = asyncHandler(async (req, res) => {
   res
     .status(200)
     .cookie("accessToken", accessToken, option)
-    .cookie("refreshtoken", refreshToken, option)
+    .cookie("refreshtoken", refreshtoken, option)
     .json(
       new ApiResponse(
         200,
         {
           loggedInUser,
           accessToken,
-          refreshToken,
+          refreshtoken,
         },
         "Logged in successfully"
       )
