@@ -160,6 +160,11 @@ const getVideoById = asyncHandler(async (req, res) => {
 
   const videoData = await Video.aggregate([
     {
+      $match: {
+        _id: new mongoose.Types.ObjectId(videoId),
+      },
+    },
+    {
       $lookup: {
         from: "users",
         localField: "owner",
