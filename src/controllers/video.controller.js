@@ -72,6 +72,11 @@ const getAllVideos = asyncHandler(async (req, res) => {
           $size: "$likes"
         }
       }
+    },
+    {
+      $sort:{
+        createdAt:-1
+      }
     }
   ];
 

@@ -124,7 +124,7 @@ const loginUser = asyncHandler(async (req, res) => {
   res
     .status(200)
     .cookie("accessToken", accessToken, option)
-    .cookie("refreshtoken", refreshtoken, option)
+    .cookie("refreshToken", refreshtoken, option)
     .json(
       new ApiResponse(
         200,
@@ -176,7 +176,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     const user = await User.findById(userId);
 
     if (!user) {
-      throw new ApiError(401, "Invalid refresh token");
+      throw new ApiError(401, "Invalid user");
     }
 
     if (incomingRefreshToken !== user?.refreshtoken) {
@@ -187,16 +187,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: true,
     };
-    const { accessToken, newRefreshToken } =
+    const { accessToken, refreshtoken } =
       await generateAccessAndRefreshTokens(user._id);
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
-      .cookie("refreshtoken", newRefreshToken, options)
+      .cookie("refreshToken", refreshtoken, options)
       .json(
         new ApiResponse(
           200,
-          { accessToken, refreshToken: newRefreshToken },
+          { accessToken, refreshtoken },
           "Access Token refreshed"
         )
       );
@@ -411,7 +411,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               pipeline: [
                 {
                   $project: {
-                    fullName: 1,
+                    username: 1,
                     avatar: 1,
                     coverImage: 1,
                   },
