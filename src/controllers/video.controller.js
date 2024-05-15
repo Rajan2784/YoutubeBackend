@@ -86,20 +86,16 @@ const getAllVideos = asyncHandler(async (req, res) => {
   const options = {
     page,
     limit,
-    skip: (page - 1) * limit,
-    limit: parseInt(limit),
-  }; // Example condition, adjust as needed
+  };
 
   // Perform query with pagination
-  const videos = await Video.aggregatePaginate(userVideos, options).then(
-    async (video) => {
-      if (video?.length === 0) throw new ApiError(404, "Videos not found");
+  const videos = await Video.aggregatePaginate(userVideos, options);
 
-      return res
-        .status(200)
-        .json(new ApiResponse(200, video, "Videos fetched successfully"));
-    }
-  );
+  if (!videos.docs.length) {
+    throw new ApiError(404, "Videos not found");
+  }
+
+  res.status(200).json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
