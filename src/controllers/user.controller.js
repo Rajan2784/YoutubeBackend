@@ -387,8 +387,78 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, channel[0], "User channel found successfully"));
 });
 
+// const getWatchHistory = asyncHandler(async (req, res) => {
+//   const userId = req.user._id;
+//   // const user = await User.findById(userId)
+//   const user = await User.aggregate([
+//     {
+//       $match: {
+//         _id: new mongoose.Types.ObjectId(userId),
+//       },
+//     },
+//     {
+//       $lookup: {
+//         from: "videos",
+//         localField: "watchHistory.video",
+//         foreignField: "_id",
+//         as: "watchedVideo",
+//         // pipeline: [
+//         //   {
+//         //     $lookup: {
+//         //       from: "users",
+//         //       localField: "video.owner",
+//         //       foreignField: "_id",
+//         //       as: "ownerDetails",
+//         //       pipeline: [
+//         //         {
+//         //           $project: {
+//         //             username: 1,
+//         //             avatar: 1,
+//         //             coverImage: 1,
+//         //           },
+//         //         },
+//         //       ],
+//         //     },
+//         //   },
+//         //   {
+//         //     $addFields: {
+//         //       owner: {
+//         //         $arrayElemAt: ["$ownerDetails", 0],
+//         //       },
+//         //     },
+//         //   },
+//         //   {
+//         //     $project: {
+//         //       ownerDetails: 0,
+//         //     },
+//         //   },
+//         // ],
+//       },
+//     },
+//     {
+//       $addFields: {
+//         history: {
+//           $first: "$watchedVideo",
+//         },
+//       },
+//     },
+//     {
+//       $project:{
+//         watchedVideo:0,
+//       }
+//     }
+//   ]);
+
+//   return res
+//     .status(200)
+//     .json(
+//       new ApiResponse(200, user, "History fetched successfully")
+//     );
+// });
+
 const getWatchHistory = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+
   const user = await User.aggregate([
     {
       $match: {
@@ -396,59 +466,57 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       },
     },
     {
+      $unwind: "$watchHistory"
+    },
+    {
       $lookup: {
         from: "videos",
-        localField: "watchHistory",
+        localField: "watchHistory.video",
         foreignField: "_id",
-        as: "watchHistory",
-        pipeline: [
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "ownerDetails",
-              pipeline: [
-                {
-                  $project: {
-                    username: 1,
-                    avatar: 1,
-                    coverImage: 1,
-                  },
-                },
-              ],
-            },
-          },
-          {
-            $addFields: {
-              owner: {
-                $arrayElemAt: ["$ownerDetails", 0],
-              },
-            },
-          },
-          {
-            $project: {
-              ownerDetails: 0,
-            },
-          },
-        ],
-      },
+        as: "videoDetails"
+      }
     },
     {
       $addFields: {
-        history: {
-          $first: "$watchHistory",
-        },
-      },
+        "video": { $arrayElemAt: ["$videoDetails", 0] }
+      }
     },
+    {
+      $lookup: {
+        from: "users",
+        localField: "video.owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline:[
+          {
+            $project:{
+              _id:1,
+              username:1,
+              avatar:1
+            }
+          }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        "video.owner": { $arrayElemAt: ["$ownerDetails", 0] }
+      }
+    },
+    {
+      $project: {
+        "_id": "$watchHistory._id",
+        "video": 1,
+        "watchedAt": "$watchHistory.watchedAt"
+      }
+    }
   ]);
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, user[0].watchHistory, "History fetched successfully")
-    );
+  return res.status(200).json(new ApiResponse(200, user, "Watch history fetched successfully"));
 });
+
+
+
 
 export {
   registerUser,

@@ -91,8 +91,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
   // Perform query with pagination
   const videos = await Video.aggregatePaginate(userVideos, options);
 
-  if (!videos.docs.length) {
-    throw new ApiError(404, "Videos not found");
+  if (videos.docs.length === 0) {
+    res.status(200).json(new ApiResponse(200, {}, "Videos fetched successfully"));
   }
 
   res.status(200).json(new ApiResponse(200, videos, "Videos fetched successfully"));
@@ -144,21 +144,31 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: get video by id
+  const userId = req.user?._id;
+
+  // Fetch the video by ID
   const video = await Video.findById(videoId);
   if (!video) throw new ApiError(404, "Video not found");
 
-  const userId = req.user?._id;
+  // Fetch the user by ID
   const user = await User.findById(userId);
   if (!user) throw new ApiError(404, "User not found");
 
-  if (!user.watchHistory.includes(videoId)) {
+  // Check if the video is already in the user's watch history
+  const alreadyWatched = user.watchHistory.some((entry) => entry.video.toString() === videoId);
+
+  // Increment views if the video is not already watched
+  if (!alreadyWatched) {
     await Video.findByIdAndUpdate(videoId, {
       $inc: { views: 1 },
-      new: true,
     });
+
+    // Add video to watch history with the current date and time
+    user.watchHistory.push({ video: videoId, watchedAt: new Date() });
+    await user.save();
   }
 
+  // Aggregation pipeline to fetch video details along with owner and likes information
   const videoData = await Video.aggregate([
     {
       $match: {
@@ -173,12 +183,12 @@ const getVideoById = asyncHandler(async (req, res) => {
         as: "owner_details",
         pipeline: [
           {
-            $lookup:{
-              from:"subscriptions",
-              localField:"_id",
-              foreignField:"channel",
-              as:"subscribers"
-            }
+            $lookup: {
+              from: "subscriptions",
+              localField: "_id",
+              foreignField: "channel",
+              as: "subscribers",
+            },
           },
           {
             $project: {
@@ -195,11 +205,11 @@ const getVideoById = asyncHandler(async (req, res) => {
       },
     },
     {
-      $lookup:{
-        from:"likes",
-        localField:"_id",
-        foreignField:"video",
-        as:"likes",
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "likes",
       },
     },
     {
@@ -207,34 +217,30 @@ const getVideoById = asyncHandler(async (req, res) => {
         owner_details: {
           $arrayElemAt: ["$owner_details", 0],
         },
-        isLiked:{
-          $cond:{
-            if:{
-              $in:[req.user._id,"$likes.likedBy"]
+        isLiked: {
+          $cond: {
+            if: {
+              $in: [req.user._id, "$likes.likedBy"],
             },
-            then:true,
-            else:false
-          }
+            then: true,
+            else: false,
+          },
         },
-        totalLikes:{
-          $size:"$likes"
-        }
+        totalLikes: {
+          $size: "$likes",
+        },
       },
     },
     {
-      $project:{
-        likes:0
-      }
-    }
+      $project: {
+        likes: 0,
+      },
+    },
   ]);
-
-  await User.findByIdAndUpdate(userId, {
-    $addToSet: { watchHistory: videoId },
-    new: true,
-  });
 
   return res.status(200).json(new ApiResponse(200, videoData, "Video found"));
 });
+
 
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
