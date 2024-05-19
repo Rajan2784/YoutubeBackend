@@ -1,7 +1,7 @@
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { deleteFromCloudinary, uploadToCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -227,27 +227,59 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
-  const avatarLocalPath = req.file?.path;
-  if (avatarLocalPath) {
+  // Check if avatar file is present
+  if (!req.file) {
     throw new ApiError(400, "Avatar file is missing");
   }
-  const avatar = await uploadToCloudinary(avatarLocalPath);
 
-  if (!avatar.url) {
-    throw new ApiError(400, "Error while uploading the avatar");
-  }
-  const user = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        avatar: avatar.url,
+  const avatarLocalPath = req.file.path;
+
+  try {
+    const currentUser = await User.findById(req.user._id);
+    if (!currentUser) {
+      throw new ApiError(404, "User not found");
+    }
+    
+    const oldAvatar = currentUser.avatar;
+
+    // Upload new avatar and delete old one
+    const avatar = await uploadToCloudinary(avatarLocalPath);
+    if (!avatar || !avatar.url) {
+      throw new ApiError(400, "Error while uploading the avatar");
+    }
+
+    // Update user avatar in the database
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          avatar: avatar.url,
+        },
       },
-    },
-    { new: true }
-  ).select("-password");
-  return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Avatar image updated successfully"));
+      { new: true }
+    ).select("-password");
+
+    // Delete old avatar from Cloudinary
+    if (oldAvatar) {
+      const deleteResponse = await deleteFromCloudinary(oldAvatar);
+      if (!deleteResponse) {
+        console.error("Failed to delete old avatar from Cloudinary");
+      }
+    }
+
+    // Return response
+    return res.status(200).json(new ApiResponse(200, user, "Avatar image updated successfully"));
+  } catch (error) {
+    // Cleanup: Delete local file if it exists
+    if (avatarLocalPath) {
+      await fs.promises.unlink(avatarLocalPath).catch((unlinkError) => {
+        console.error('Error while deleting local avatar file:', unlinkError);
+      });
+    }
+
+    // Rethrow error to be handled by the asyncHandler
+    throw error;
+  }
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
@@ -255,24 +287,45 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (coverLocalPath) {
     throw new ApiError(400, "CoverImage file is missing");
   }
-  const coverImage = await uploadToCloudinary(coverLocalPath);
+  try {
+    const currentUser = await User.findById(req.user?._id)
+    const oldCoverImage = currentUser.coverImage
+    const coverImage = await uploadToCloudinary(coverLocalPath);
 
-  if (!coverImage.url) {
-    throw new ApiError(400, "Error while uploading the cover image");
-  }
-  const user = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        coverImage: avatar.url,
+    if (!coverImage.url) {
+      throw new ApiError(400, "Error while uploading the cover image");
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          coverImage: coverImage.url,
+        },
       },
-    },
-    { new: true }
-  ).select("-password");
+      { new: true }
+    ).select("-password");
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Cover image updated successfully"));
+    if (oldCoverImage) {
+      const deleteResponse = await deleteFromCloudinary(oldCoverImage);
+      if (!deleteResponse) {
+        console.error("Failed to delete old avatar from Cloudinary");
+      }
+    }
+  
+    return res
+      .status(200)
+      .json(new ApiResponse(200, user, "Cover image updated successfully"));
+  } catch (error) {
+    if (coverLocalPath) {
+      await fs.promises.unlink(coverLocalPath).catch((unlinkError) => {
+        console.error('Error while deleting local avatar file:', unlinkError);
+      });
+    }
+
+    // Rethrow error to be handled by the asyncHandler
+    throw error;
+  }
 });
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
@@ -387,75 +440,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, channel[0], "User channel found successfully"));
 });
 
-// const getWatchHistory = asyncHandler(async (req, res) => {
-//   const userId = req.user._id;
-//   // const user = await User.findById(userId)
-//   const user = await User.aggregate([
-//     {
-//       $match: {
-//         _id: new mongoose.Types.ObjectId(userId),
-//       },
-//     },
-//     {
-//       $lookup: {
-//         from: "videos",
-//         localField: "watchHistory.video",
-//         foreignField: "_id",
-//         as: "watchedVideo",
-//         // pipeline: [
-//         //   {
-//         //     $lookup: {
-//         //       from: "users",
-//         //       localField: "video.owner",
-//         //       foreignField: "_id",
-//         //       as: "ownerDetails",
-//         //       pipeline: [
-//         //         {
-//         //           $project: {
-//         //             username: 1,
-//         //             avatar: 1,
-//         //             coverImage: 1,
-//         //           },
-//         //         },
-//         //       ],
-//         //     },
-//         //   },
-//         //   {
-//         //     $addFields: {
-//         //       owner: {
-//         //         $arrayElemAt: ["$ownerDetails", 0],
-//         //       },
-//         //     },
-//         //   },
-//         //   {
-//         //     $project: {
-//         //       ownerDetails: 0,
-//         //     },
-//         //   },
-//         // ],
-//       },
-//     },
-//     {
-//       $addFields: {
-//         history: {
-//           $first: "$watchedVideo",
-//         },
-//       },
-//     },
-//     {
-//       $project:{
-//         watchedVideo:0,
-//       }
-//     }
-//   ]);
-
-//   return res
-//     .status(200)
-//     .json(
-//       new ApiResponse(200, user, "History fetched successfully")
-//     );
-// });
-
 const getWatchHistory = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
@@ -514,9 +498,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
   return res.status(200).json(new ApiResponse(200, user, "Watch history fetched successfully"));
 });
-
-
-
 
 export {
   registerUser,
